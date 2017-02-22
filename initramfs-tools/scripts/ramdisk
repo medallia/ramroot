@@ -43,7 +43,7 @@ ramroot_mount()
 		pixz -d -t
 	else
 		busybox cat
-	fi | ( cd ${rootmnt} && tar x ) || panic 'Unable to extract root filesystem'
+	fi | ( cd ${rootmnt} && busybox tar -x ) || panic 'Unable to extract root filesystem'
 }
 
 mountroot()

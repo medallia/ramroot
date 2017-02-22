@@ -1,0 +1,13 @@
+FROM ubuntu:16.04
+
+# Prevent dpkg from asking questions
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install ifupdown, so DNS will work in the booted system
+RUN apt-get update && \
+    apt-get -y dist-upgrade && \
+    apt-get -y install ifupdown && \
+    apt-get clean all
+
+# Unset the root password
+RUN passwd -d root

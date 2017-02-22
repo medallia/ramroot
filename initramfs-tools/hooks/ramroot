@@ -6,4 +6,3 @@ esac
 . /usr/share/initramfs-tools/hook-functions
 
 copy_exec /usr/bin/pixz /bin
-copy_exec /bin/tar /bin
