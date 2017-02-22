@@ -1,0 +1,36 @@
+#! /bin/sh
+
+# If we know the boot interface and there is nothing in /etc/network/interfaces.d,
+# configure it to bring up networking using DHCP
+
+set -e
+
+if [ "$1" = "prereqs" ]; then
+	exit 0
+fi
+
+if [ -n "$BOOTIF" ] && [ -z "$(ls ${rootmnt}/etc/network/interfaces.d)" ]; then
+	bootif_mac="$(echo "${BOOTIF#01-}" | busybox tr - :)"
+	# look for devices with matching mac address, and set DEVICE to
+	# appropriate value if match is found.
+	DEVICE=
+	for device in /sys/class/net/* ; do
+		if [ -f "$device/address" ]; then
+			if [ "$bootif_mac" = $(cat "$device/address") ]; then
+				DEVICE=${device##*/}
+				break
+			fi
+		fi
+	done
+	if [ -n "$DEVICE" ]; then
+		cat > ${rootmnt}/etc/network/interfaces.d/bootif <<EOF
+auto lo
+iface lo inet loopback
+
+auto $DEVICE
+iface $DEVICE inet dhcp
+EOF
+	fi
+fi
+
+exit 0

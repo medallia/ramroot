@@ -1,0 +1,91 @@
+# Ramdisk filesystem mounting			-*- shell-script -*-
+
+ramroot_is_remote()
+{
+	case "$1" in
+		http://*|https://*|ftp://*)
+			true;;
+		*)
+			false;;
+	esac
+}
+
+ramroot_is_xzipped()
+{
+	case "$1" in
+		*.xz)
+			true;;
+		*)
+			false;;
+	esac
+}
+
+ramroot_mount()
+{
+	local ramroot="$1"
+	local memtotal=$(awk '/^MemTotal:/{print $2"k"}' /proc/meminfo)
+
+	# Mount a ramdisk to extract the tar image on
+	if mount -t tmpfs -o size=${memtotal:-500M} tmpfs ${rootmnt} ; then
+		:
+	elif mount -t shm shm ${rootmnt} ; then
+		:
+	else
+		mount -t ramfs ramfs ${rootmnt}
+	fi
+
+	# Download and extract ramdisk tar image
+	if ramroot_is_remote "$ramroot"; then
+		busybox wget -O - "$ramroot"
+	else
+		busybox cat "$ramroot"
+	fi | if ramroot_is_xzipped "$ramroot"; then
+		pixz -d -t
+	else
+		busybox cat
+	fi | ( cd ${rootmnt} && busybox tar -x ) || panic 'Unable to extract root filesystem'
+}
+
+mountroot()
+{
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/ramdisk-top"
+	run_scripts /scripts/ramdisk-top
+	[ "$quiet" != "y" ] && log_end_msg
+
+	# Parse command line options to get ramroot
+	local ramroot
+	for x in $(cat /proc/cmdline); do
+		case "$x" in
+		ramroot=*)
+			ramroot="${x#ramroot=}"
+			;;
+		esac
+	done
+	if [ -z "$ramroot" ] && [ -e /ramroot.xz ]; then
+		ramroot=/ramroot.xz
+	fi
+	if [ -z "$ramroot" ]; then
+		panic "No tar image for root found. Try passing ramroot= bootarg."
+	fi
+
+	# Configure networking if necessary
+	if ramroot_is_remote "$ramroot"; then
+		[ "$quiet" != "y" ] && log_begin_msg "Configuring networking"
+		modprobe af_packet
+		wait_for_udev 10
+		configure_networking
+		[ "$quiet" != "y" ] && log_end_msg
+	fi
+
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/ramdisk-premount"
+	run_scripts /scripts/ramdisk-premount
+	[ "$quiet" != "y" ] && log_end_msg
+
+	[ "$quiet" != "y" ] && log_begin_msg "Installing root filesystem"
+	ramroot_mount "$ramroot"
+	[ "$quiet" != "y" ] && log_end_msg
+
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/ramdisk-bottom"
+	run_scripts /scripts/ramdisk-bottom
+	[ "$quiet" != "y" ] && log_end_msg
+}

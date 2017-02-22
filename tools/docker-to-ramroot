@@ -1,0 +1,32 @@
+#! /bin/bash
+
+set -euo pipefail
+
+die () {
+	echo "$1" >&2
+	exit 1
+}
+
+if [ $# -lt 2 ]; then
+	die "Usage: $0 <dockerimage> <ramrootimage>"
+fi
+
+DOCKER_IMAGE="$1"
+RAMROOT_IMAGE_FILE="$2"
+TMP_NAME="${DOCKER_IMAGE//[^a-zA-Z0-9]/_}.$$"
+
+case "$RAMROOT_IMAGE_FILE" in
+	*.tar.xz)
+		;;
+	*)
+		die "Ramroot image must end with .tar.xz"
+		;;
+esac
+
+echo "Creating temporary docker instance ${TMP_NAME}"
+docker run -it --name "${TMP_NAME}" "${DOCKER_IMAGE}" \
+	/bin/echo "Exporting temporary docker instance to ${RAMROOT_IMAGE_FILE}"
+docker export "${TMP_NAME}" | pixz -9 > "${RAMROOT_IMAGE_FILE}.tmp"
+mv "${RAMROOT_IMAGE_FILE}.tmp" "${RAMROOT_IMAGE_FILE}"
+echo "Cleaning up temporary docker instance"
+docker rm -f "${TMP_NAME}"

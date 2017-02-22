@@ -1,0 +1,17 @@
+#! /bin/sh
+
+# Copy all modules/firmwares from the initramfs to the root filesystem. This
+# allows using a root filesystem without the modules installed, thus avoiding
+# to transfer them twice.
+
+set -e
+
+if [ "$1" = "prereqs" ]; then
+	exit 0
+fi
+
+if [ ! -d ${rootmnt}/lib/modules ]; then
+	cp -a /lib/modules /lib/firmware ${rootmnt}/lib
+fi
+
+exit 0
